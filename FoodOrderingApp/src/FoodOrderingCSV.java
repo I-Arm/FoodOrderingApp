@@ -18,6 +18,12 @@ public class FoodOrderingCSV extends JFrame {
 
     private List<Food> foodList;
     private JButton deleteBtn; // <-- ย้ายมาประกาศเป็น field
+    
+    // *************** ฟิลด์เพิ่มเติม ***************
+    private JPanel menuPanel;
+    private JScrollPane menuScrollPane;
+    // ***********************************************
+
 
     public FoodOrderingCSV(List<Food> foodList) {
         this.foodList = foodList;
@@ -31,22 +37,10 @@ public class FoodOrderingCSV extends JFrame {
 
         Font thaiFont = new Font("Tahoma", Font.PLAIN, 16);
 
-        // ส่วนเมนู 
-        JPanel menuPanel = new JPanel();
-        menuPanel.setLayout(new GridLayout(0, 3, 10, 10));
-
-        for (Food food : foodList) {
-            ImageIcon icon = new ImageIcon(food.getImagePath());
-            Image img = icon.getImage().getScaledInstance(120, 90, Image.SCALE_SMOOTH);
-
-            JButton btn = new JButton("<html>" + food.getName() + "</html>", new ImageIcon(img));
-            btn.setFont(thaiFont);
-            btn.setHorizontalTextPosition(SwingConstants.CENTER);
-            btn.setVerticalTextPosition(SwingConstants.BOTTOM);
-
-            btn.addActionListener(e -> showFoodOption(food));
-            menuPanel.add(btn);
-        }
+        // ส่วนเมนู (เปลี่ยนมาเรียกเมธอดใหม่)
+        menuPanel = createMenuPanel(thaiFont);
+        menuScrollPane = new JScrollPane(menuPanel);
+        // ... (โค้ดที่เหลือใน constructor เหมือนเดิม) ...
 
 
         // ส่วนตะกร้า 
@@ -91,7 +85,7 @@ public class FoodOrderingCSV extends JFrame {
 
         orderPanel.add(buttonPanel, BorderLayout.NORTH);
 
-        add(new JScrollPane(menuPanel), BorderLayout.CENTER);
+        add(menuScrollPane, BorderLayout.CENTER); // ใช้ menuScrollPane ที่สร้างใหม่
         add(orderPanel, BorderLayout.EAST);
 
          orderTable.getSelectionModel().addListSelectionListener(e -> {
@@ -140,8 +134,55 @@ public class FoodOrderingCSV extends JFrame {
         topPanel.add(loginBtn);
         add(topPanel, BorderLayout.NORTH);
     }
+    
+    // *************** เมธอดใหม่สำหรับสร้างแผงเมนู ***************
+    private JPanel createMenuPanel(Font thaiFont) {
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(0, 3, 10, 10));
+
+        for (Food food : foodList) {
+            // ป้องกันรูปภาพหาย
+            ImageIcon icon;
+            try {
+                icon = new ImageIcon(food.getImagePath());
+                if (icon.getIconWidth() == -1) { // ตรวจสอบว่าโหลดภาพไม่ได้
+                    icon = new ImageIcon(); // ใช้ไอคอนว่าง
+                    System.err.println("❌ รูปภาพไม่พบ: " + food.getImagePath());
+                }
+            } catch (Exception e) {
+                icon = new ImageIcon();
+                System.err.println("❌ รูปภาพมีปัญหา: " + food.getImagePath());
+            }
+            
+            Image img = icon.getImage().getScaledInstance(120, 90, Image.SCALE_SMOOTH);
+
+            JButton btn = new JButton("<html>" + food.getName() + "</html>", new ImageIcon(img));
+            btn.setFont(thaiFont);
+            btn.setHorizontalTextPosition(SwingConstants.CENTER);
+            btn.setVerticalTextPosition(SwingConstants.BOTTOM);
+
+            btn.addActionListener(e -> showFoodOption(food));
+            panel.add(btn);
+        }
+        return panel;
+    }
+    
+    // *************** เมธอดใหม่สำหรับรีโหลดแผงเมนู ***************
+    private void reloadMenuPanel() {
+        this.remove(menuScrollPane); // ลบ JScrollPane เก่า
+        
+        // สร้าง JScrollPane ใหม่ด้วยเมนูที่อัพเดท
+        menuPanel = createMenuPanel(new Font("Tahoma", Font.PLAIN, 16)); 
+        menuScrollPane = new JScrollPane(menuPanel);
+        
+        this.add(menuScrollPane, BorderLayout.CENTER); // เพิ่ม JScrollPane ใหม่
+        this.revalidate(); // รีโหลด component ใหม่
+        this.repaint(); // วาดใหม่
+    }
+    // *************************************************************
 
     private void showFoodOption(Food food) {
+        // ... (เมธอด showFoodOption เหมือนเดิม) ...
         if (food.getCategory().equals("เครื่องดื่ม")) {
             Object[] options = {
                 "เล็ก (" + food.getNormalPrice() + " บาท)",
@@ -199,7 +240,7 @@ public class FoodOrderingCSV extends JFrame {
         String[] columns = {"ชื่อเมนู", "ราคา ปกติ", "ราคา พิเศษ", "รูปภาพ", "ประเภท"};
         DefaultTableModel adminModel = new DefaultTableModel(columns, 0);
         
-        // โหลดข้อมูลจาก foodList
+        // โหลดข้อมูลจาก foodList ปัจจุบัน
         for (Food f : foodList) {
             adminModel.addRow(new Object[]{
                 f.getName(), f.getNormalPrice(), f.getSpecialPrice(),
@@ -213,6 +254,18 @@ public class FoodOrderingCSV extends JFrame {
         JButton addBtn = new JButton("เพิ่มเมนู");
         JButton editBtn = new JButton("แก้ไขเมนู");
         JButton deleteBtn = new JButton("ลบเมนู");
+        
+        // *************** ปุ่มบันทึกการเปลี่ยนแปลง ***************
+        JButton saveChangesBtn = new JButton("บันทึกการเปลี่ยนแปลง"); 
+        saveChangesBtn.setFont(thaiFont);
+        saveChangesBtn.addActionListener(e -> {
+            // อัพเดท foodList และบันทึกไป CSV
+            FoodMenuLoader.updateFoodListFromAdminModel(adminModel, foodList); 
+            reloadMenuPanel(); // รีโหลดเมนูในหน้าหลัก
+            JOptionPane.showMessageDialog(adminFrame, "✅ บันทึกและอัพเดทเมนูเรียบร้อยแล้ว");
+        });
+        // *************************************************************
+
 
         addBtn.addActionListener(e -> {
             addOrEditMenu(adminModel, null);
@@ -230,8 +283,10 @@ public class FoodOrderingCSV extends JFrame {
         deleteBtn.addActionListener(e -> {
             int row = adminTable.getSelectedRow();
             if (row != -1) {
-                adminModel.removeRow(row);
-                JOptionPane.showMessageDialog(adminFrame, "ลบเมนูเรียบร้อย");
+                // *************** การลบจะทำทันทีในตาราง ***************
+                adminModel.removeRow(row); 
+                // ******************************************************
+                JOptionPane.showMessageDialog(adminFrame, "ลบเมนูเรียบร้อย (กรุณากด 'บันทึกการเปลี่ยนแปลง' เพื่อยืนยัน)");
             }
         });
 
@@ -239,16 +294,30 @@ public class FoodOrderingCSV extends JFrame {
         btnPanel.add(addBtn);
         btnPanel.add(editBtn);
         btnPanel.add(deleteBtn);
+        btnPanel.add(saveChangesBtn); // เพิ่มปุ่มบันทึก
 
         adminFrame.add(scrollPane, BorderLayout.CENTER);
         adminFrame.add(btnPanel, BorderLayout.SOUTH);
 
         adminFrame.setVisible(true);
 
-        
+        // *************** เพิ่ม Listener สำหรับการบันทึกเมื่อปิดหน้าจอ ***************
+        adminFrame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                int confirm = JOptionPane.showConfirmDialog(adminFrame, 
+                    "คุณต้องการบันทึกการเปลี่ยนแปลงหรือไม่?", "ยืนยันการบันทึก", JOptionPane.YES_NO_OPTION);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    FoodMenuLoader.updateFoodListFromAdminModel(adminModel, foodList); 
+                    reloadMenuPanel();
+                }
+            }
+        });
+        // ******************************************************************************
     }
 
     private void addOrEditMenu(DefaultTableModel model, Integer rowIndex) {
+        // ... (เมธอด addOrEditMenu เหมือนเดิม) ...
         JTextField nameField = new JTextField();
         JTextField normalField = new JTextField();
         JTextField specialField = new JTextField();
@@ -275,27 +344,35 @@ public class FoodOrderingCSV extends JFrame {
             (rowIndex == null ? "เพิ่มเมนู" : "แก้ไขเมนู"), JOptionPane.OK_CANCEL_OPTION);
 
         if (option == JOptionPane.OK_OPTION) {
-            String name = nameField.getText();
-            double normal = Double.parseDouble(normalField.getText());
-            double special = Double.parseDouble(specialField.getText());
-            String img = imgField.getText();
-            String category = categoryField.getText();
+            // *************** เพิ่ม try-catch เพื่อจัดการข้อผิดพลาดในการแปลงค่า ***************
+            try {
+                String name = nameField.getText();
+                double normal = Double.parseDouble(normalField.getText());
+                double special = Double.parseDouble(specialField.getText());
+                String img = imgField.getText();
+                String category = categoryField.getText();
 
-            if (rowIndex == null) {
-                model.addRow(new Object[]{name, normal, special, img, category});
-            } else {
-                model.setValueAt(name, rowIndex, 0);
-                model.setValueAt(normal, rowIndex, 1);
-                model.setValueAt(special, rowIndex, 2);
-                model.setValueAt(img, rowIndex, 3);
-                model.setValueAt(category, rowIndex, 4);
+                if (rowIndex == null) {
+                    model.addRow(new Object[]{name, normal, special, img, category});
+                } else {
+                    model.setValueAt(name, rowIndex, 0);
+                    model.setValueAt(normal, rowIndex, 1);
+                    model.setValueAt(special, rowIndex, 2);
+                    model.setValueAt(img, rowIndex, 3);
+                    model.setValueAt(category, rowIndex, 4);
+                }
+
+                JOptionPane.showMessageDialog(this, "บันทึกเมนูเรียบร้อย (กรุณากด 'บันทึกการเปลี่ยนแปลง' เพื่อยืนยัน)");
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "⚠️ กรุณาป้อนค่าราคาเป็นตัวเลขที่ถูกต้อง", "ข้อผิดพลาด", JOptionPane.ERROR_MESSAGE);
             }
-
-            JOptionPane.showMessageDialog(this, "บันทึกเมนูเรียบร้อย");
+            // *********************************************************************************
         }
     }
+    // ... (เมธอด removeSelectedItem, addToOrder, showReceiptPopup, saveToCSV เหมือนเดิม) ...
 
     private void removeSelectedItem() {
+        // ... (เมธอด removeSelectedItem เหมือนเดิม) ...
         int selectedRow = orderTable.getSelectedRow();
         if (selectedRow != -1) {
             String category = tableModel.getValueAt(selectedRow, 0).toString(); // คอลัมน์ Category
@@ -331,6 +408,7 @@ public class FoodOrderingCSV extends JFrame {
     }
 
     private void showReceiptPopup(String fileName) {
+        // ... (เมธอด showReceiptPopup เหมือนเดิม) ...
         JDialog receiptDialog = new JDialog(this, "บิลใบเสร็จ", true);
         receiptDialog.setSize(400, 500);
         receiptDialog.setLocationRelativeTo(this);
